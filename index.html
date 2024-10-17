@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CouchDB Query Application</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+        .query-box {
+            margin-bottom: 20px;
+        }
+        .results {
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>CouchDB Query Application</h1>
+
+    <div class="query-box">
+        <h2>Mango Query</h2>
+        <textarea id="mangoQuery" rows="4" cols="50" placeholder='{"selector": {"driverId": 1}}'></textarea><br>
+        <button id="runMangoQuery">Run Mango Query</button>
+        <div class="results" id="mangoResults"></div>
+    </div>
+
+    <div class="query-box">
+        <h2>MapReduce Query</h2>
+        <label for="viewName">View Name:</label>
+        <input type="text" id="viewName" value="count_by_nationality"><br>
+        <label for="useReduce">Use Reduce:</label>
+        <input type="checkbox" id="useReduce" checked><br>
+        <button id="runMapReduceQuery">Run MapReduce Query</button>
+        <div class="results" id="mapReduceResults"></div>
+    </div>
+
+    <script>
+        $(document).ready(function() {
+            $('#runMangoQuery').click(function() {
+                const mangoQuery = $('#mangoQuery').val();
+                
+                try {
+                    const parsedQuery = JSON.parse(mangoQuery);
+                    $.ajax({
+                        type: 'POST',
+                        url: '/mango_query',
+                        contentType: 'application/json', 
+                        data: JSON.stringify(parsedQuery), 
+                        success: function(data) {
+                            $('#mangoResults').html(JSON.stringify(data, null, 2));
+                        },
+                        error: function(err) {
+                            $('#mangoResults').html("Error: " + (err.responseJSON.error || "Unknown error"));
+                        }
+                    });
+                } catch (e) {
+                    $('#mangoResults').html("Error: Invalid JSON format.");
+                }
+            });
+
+            $('#runMapReduceQuery').click(function() {
+                const viewName = $('#viewName').val();
+                const useReduce = $('#useReduce').is(':checked');
+                $.ajax({
+                    type: 'POST',
+                    url: '/mapreduce_query',
+                    contentType: 'application/json',
+                    data: JSON.stringify({
+                        view_name: viewName,
+                        use_reduce: useReduce
+                    }),
+                    success: function(data) {
+                        $('#mapReduceResults').html(JSON.stringify(data, null, 2));
+                    },
+                    error: function(err) {
+                        $('#mapReduceResults').html("Error: " + (err.responseJSON.error || "Unknown error"));
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

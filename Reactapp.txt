@@ -1,0 +1,278 @@
+// src/App.js
+import React, { useState, useEffect } from 'react';
+import PouchDB from 'pouchdb-browser';
+
+const localDB = new PouchDB('drivers'); // Local PouchDB database
+const remoteDB = 'http://T00222705:Admin1234@127.0.0.1:5984/drivers'; //My local DB
+
+// Query for searching
+const App = () => {
+  const [drivers, setDrivers] = useState([]); 
+  const [searchQuery, setSearchQuery] = useState(''); 
+  const [newDriver, setNewDriver] = useState({
+    driverRef: '',
+    forename: '',
+    surname: '',
+    nationality: '',
+    dob: '',
+    number: '',
+    code: '',
+    url: '',
+  });
+  // Driver being edited
+  const [editDriver, setEditDriver] = useState(null); 
+  const [showAddDriverForm, setShowAddDriverForm] = useState(false); 
+
+  // Fetching drivers from local PouchDB
+  const fetchDrivers = async () => {
+    try {
+      const result = await localDB.allDocs({ include_docs: true });
+      const driversList = result.rows.map(row => row.doc);
+      setDrivers(driversList);
+    } catch (error) {
+      console.error('Error fetching drivers:', error);
+    }
+  };
+
+  // Synchronizing with CouchDB
+  const syncWithCouchDB = () => {
+    const sync = localDB.sync(remoteDB, {
+      live: true,
+      retry: true,
+    }).on('change', () => {
+      fetchDrivers(); 
+    }).on('error', (err) => {
+      console.error('Sync error:', err);
+    });
+  };
+
+  // Adding a new driver
+  const addDriver = async () => {
+    const driver = { ...newDriver, _id: newDriver.driverRef }; 
+    await localDB.put(driver);
+    alert('Driver added successfully!');
+    resetNewDriver(); 
+    setShowAddDriverForm(false); 
+    fetchDrivers(); 
+  };
+
+  // Updating an existing driver
+  const updateDriver = async () => {
+    const driver = { ...editDriver, ...newDriver }; 
+    await localDB.put(driver);
+    alert('Driver updated successfully!');
+    setEditDriver(null); 
+    resetNewDriver(); 
+    fetchDrivers(); 
+  };
+
+  // Setting driver for editing
+  const startEditingDriver = (driver) => {
+    setEditDriver(driver); 
+    setNewDriver({ 
+      driverRef: driver.driverRef,
+      forename: driver.forename,
+      surname: driver.surname,
+      nationality: driver.nationality,
+      dob: driver.dob,
+      number: driver.number,
+      code: driver.code,
+      url: driver.url,
+    });
+  };
+
+  // Removing a driver
+  const deleteDriver = async (id) => {
+    const driver = await localDB.get(id); 
+    await localDB.remove(driver); 
+    alert('Driver deleted successfully!');
+    fetchDrivers(); 
+  };
+
+  // Searching drivers by name
+  const searchDrivers = () => {
+    return drivers.filter(driver =>
+      `${driver.forename} ${driver.surname}`
+        .toLowerCase()
+        .includes(searchQuery.toLowerCase())
+    );
+  };
+
+  // Reseting the new driver form
+  const resetNewDriver = () => {
+    setNewDriver({
+      driverRef: '',
+      forename: '',
+      surname: '',
+      nationality: '',
+      dob: '',
+      number: '',
+      code: '',
+      url: '',
+    });
+  };
+
+  // Fetching drivers and Synchronizing with CouchDB
+  useEffect(() => {
+    fetchDrivers();
+    syncWithCouchDB();
+  }, []);
+
+  return (
+    <div style={{ padding: '20px' }}>
+      <h1>Drivers List</h1>
+      <textarea
+        value={drivers.map(driver => `${driver.forename} ${driver.surname} (${driver.nationality})`).join('\n')}
+        readOnly
+        rows={10}
+        style={{ width: '100%', resize: 'none' }} 
+      />
+      
+      <h2>Search Drivers</h2>
+      <input
+        type="text"
+        placeholder="Search by name..."
+        value={searchQuery}
+        onChange={(e) => setSearchQuery(e.target.value)}
+        style={{ marginBottom: '10px', width: '100%' }}
+      />
+
+      {/* Rendering the search results only when there's a search query */}
+      {searchQuery && (
+        <ul>
+          {searchDrivers().map(driver => (
+            <li key={driver._id}>
+              {`${driver.forename} ${driver.surname} (${driver.nationality})`}
+              <button onClick={() => startEditingDriver(driver)}>Edit</button>
+              <button onClick={() => deleteDriver(driver._id)}>Delete</button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {/* Confirmation for add driver */}
+      <h2>Add Driver</h2>
+      <p>Do you want to add a driver?</p>
+      <button onClick={() => setShowAddDriverForm(true)}>Yes</button>
+
+      {/* Add Driver Form */}
+      {showAddDriverForm && (
+        <div>
+          <div>
+            <input
+              type="text"
+              placeholder="Driver Ref"
+              value={newDriver.driverRef}
+              onChange={(e) => setNewDriver({ ...newDriver, driverRef: e.target.value })}
+            />
+            <input
+              type="text"
+              placeholder="Forename"
+              value={newDriver.forename}
+              onChange={(e) => setNewDriver({ ...newDriver, forename: e.target.value })}
+            />
+            <input
+              type="text"
+              placeholder="Surname"
+              value={newDriver.surname}
+              onChange={(e) => setNewDriver({ ...newDriver, surname: e.target.value })}
+            />
+            <input
+              type="text"
+              placeholder="Nationality"
+              value={newDriver.nationality}
+              onChange={(e) => setNewDriver({ ...newDriver, nationality: e.target.value })}
+            />
+            <input
+              type="date"
+              placeholder="DOB"
+              value={newDriver.dob}
+              onChange={(e) => setNewDriver({ ...newDriver, dob: e.target.value })}
+            />
+            <input
+              type="text"
+              placeholder="Number"
+              value={newDriver.number}
+              onChange={(e) => setNewDriver({ ...newDriver, number: e.target.value })}
+            />
+            <input
+              type="text"
+              placeholder="Code"
+              value={newDriver.code}
+              onChange={(e) => setNewDriver({ ...newDriver, code: e.target.value })}
+            />
+            <input
+              type="text"
+              placeholder="URL"
+              value={newDriver.url}
+              onChange={(e) => setNewDriver({ ...newDriver, url: e.target.value })}
+            />
+            <button onClick={addDriver}>Add Driver</button>
+            <button onClick={() => { setShowAddDriverForm(false); resetNewDriver(); }}>Cancel</button>
+          </div>
+        </div>
+      )}
+
+      {/* Update Driver Form */}
+      {editDriver && (
+        <div style={{ marginTop: '20px' }}>
+          <h2>Update Driver</h2>
+          <div>
+            <input
+              type="text"
+              placeholder="Driver Ref"
+              value={newDriver.driverRef}
+              onChange={(e) => setNewDriver({ ...newDriver, driverRef: e.target.value })}
+            />
+            <input
+              type="text"
+              placeholder="Forename"
+              value={newDriver.forename}
+              onChange={(e) => setNewDriver({ ...newDriver, forename: e.target.value })}
+            />
+            <input
+              type="text"
+              placeholder="Surname"
+              value={newDriver.surname}
+              onChange={(e) => setNewDriver({ ...newDriver, surname: e.target.value })}
+            />
+            <input
+              type="text"
+              placeholder="Nationality"
+              value={newDriver.nationality}
+              onChange={(e) => setNewDriver({ ...newDriver, nationality: e.target.value })}
+            />
+            <input
+              type="date"
+              placeholder="DOB"
+              value={newDriver.dob}
+              onChange={(e) => setNewDriver({ ...newDriver, dob: e.target.value })}
+            />
+            <input
+              type="text"
+              placeholder="Number"
+              value={newDriver.number}
+              onChange={(e) => setNewDriver({ ...newDriver, number: e.target.value })}
+            />
+            <input
+              type="text"
+              placeholder="Code"
+              value={newDriver.code}
+              onChange={(e) => setNewDriver({ ...newDriver, code: e.target.value })}
+            />
+            <input
+              type="text"
+              placeholder="URL"
+              value={newDriver.url}
+              onChange={(e) => setNewDriver({ ...newDriver, url: e.target.value })}
+            />
+            <button onClick={updateDriver}>Update Driver</button>
+            <button onClick={() => { setEditDriver(null); resetNewDriver(); }}>Cancel</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default App;
